@@ -35,7 +35,7 @@
  * @file init.c
  *
  * PX4FMU-specific early startup code.  This file implements the
- * nsh_archinitialize() function that is called early by nsh during startup.
+ * board_app_initialize() function that is called early by nsh during startup.
  *
  * Code here is run before the rcS script is invoked; it should start required
  * subsystems and perform board-specific initialisation.
@@ -63,11 +63,12 @@
 #include <chip.h>
 #include <stm32_uart.h>
 #include <arch/board/board.h>
-#include "up_internal.h"
+#include "arm_internal.h"
 
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_board_led.h>
 #include <systemlib/px4_macros.h>
+#include <px4_arch/io_timer.h>
 #include <px4_platform_common/init.h>
 #include <px4_platform/gpio.h>
 #include <px4_platform/board_determine_hw_info.h>
@@ -80,7 +81,7 @@
 /* Configuration ************************************************************/
 
 /*
- * Ideally we'd be able to get these from up_internal.h,
+ * Ideally we'd be able to get these from arm_internal.h,
  * but since we want to be able to disable the NuttX use
  * of leds for system indication at will and there is no
  * separate switch, we need to build independent of the
@@ -104,7 +105,7 @@ __EXPORT void board_peripheral_reset(int ms)
 	/* set the peripheral rails off */
 
 	VDD_5V_PERIPH_EN(false);
-	VDD_3V3_SENSORS_EN(false);
+	board_control_spi_sensors_power(false, 0xffff);
 
 	bool last = READ_VDD_3V3_SPEKTRUM_POWER_EN();
 	/* Keep Spektum on to discharge rail*/
@@ -118,7 +119,7 @@ __EXPORT void board_peripheral_reset(int ms)
 
 	/* switch the peripheral rail back on */
 	VDD_3V3_SPEKTRUM_POWER_EN(last);
-	VDD_3V3_SENSORS_EN(true);
+	board_control_spi_sensors_power(true, 0xffff);
 	VDD_5V_PERIPH_EN(true);
 
 }
@@ -136,10 +137,9 @@ __EXPORT void board_peripheral_reset(int ms)
  ************************************************************************************/
 __EXPORT void board_on_reset(int status)
 {
-	/* configure the GPIO pins to outputs and keep them low */
-
-	const uint32_t gpio[] = PX4_GPIO_PWM_INIT_LIST;
-	px4_gpio_init(gpio, arraySize(gpio));
+	for (int i = 0; i < DIRECT_PWM_OUTPUT_CHANNELS; ++i) {
+		px4_arch_configgpio(PX4_MAKE_GPIO_INPUT(io_timer_channel_get_as_pwm_input(i)));
+	}
 
 	if (status >= 0) {
 		up_mdelay(6);
@@ -170,9 +170,7 @@ stm32_boardinitialize(void)
 	const uint32_t gpio[] = PX4_GPIO_INIT_LIST;
 	px4_gpio_init(gpio, arraySize(gpio));
 
-	/* configure SPI interfaces */
-
-	stm32_spiinitialize();
+	board_control_spi_sensors_power_configgpio();
 
 	/* configure USB interfaces */
 
@@ -209,10 +207,9 @@ stm32_boardinitialize(void)
 __EXPORT int board_app_initialize(uintptr_t arg)
 {
 	/* Power on Interfaces */
-	VDD_3V3_SD_CARD_EN(true);
 	VDD_5V_PERIPH_EN(true);
 	VDD_5V_HIPOWER_EN(true);
-	VDD_3V3_SENSORS_EN(true);
+	board_control_spi_sensors_power(true, 0xffff);
 	VDD_3V3_SPEKTRUM_POWER_EN(true);
 
 	/* Need hrt running before using the ADC */
@@ -227,6 +224,10 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 	} else {
 		syslog(LOG_ERR, "[boot] Failed to read HW revision and version\n");
 	}
+
+	/* configure SPI interfaces (after we determined the HW version) */
+
+	stm32_spiinitialize();
 
 	/* configure the DMA allocator */
 
@@ -264,6 +265,11 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 		led_on(LED_RED);
 	}
 
+	// Ensure Power is off for > 10 mS
+	usleep(15 * 1000);
+	VDD_3V3_SD_CARD_EN(true);
+	usleep(500 * 1000);
+
 #ifdef CONFIG_MMCSD
 	int ret = stm32_sdio_initialize();
 
@@ -273,6 +279,10 @@ __EXPORT int board_app_initialize(uintptr_t arg)
 	}
 
 #endif /* CONFIG_MMCSD */
+
+	/* Configure the HW based on the manifest */
+
+	px4_platform_configure();
 
 	return OK;
 }

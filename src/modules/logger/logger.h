@@ -41,19 +41,25 @@
 #include <drivers/drv_hrt.h>
 #include <version/version.h>
 #include <parameters/param.h>
-#include <systemlib/printload.h>
+#include <px4_platform_common/printload.h>
 #include <px4_platform_common/module.h>
+#include <px4_platform_common/module_params.h>
 
+#include <uORB/PublicationMulti.hpp>
 #include <uORB/Subscription.hpp>
 #include <uORB/SubscriptionInterval.hpp>
+#include <uORB/topics/logger_status.h>
 #include <uORB/topics/log_message.h>
 #include <uORB/topics/manual_control_setpoint.h>
 #include <uORB/topics/vehicle_command.h>
 #include <uORB/topics/vehicle_status.h>
+#include <uORB/topics/parameter_update.h>
 
 extern "C" __EXPORT int logger_main(int argc, char *argv[]);
 
-static constexpr hrt_abstime TRY_SUBSCRIBE_INTERVAL{1000 * 1000};	// interval in microseconds at which we try to subscribe to a topic
+using namespace time_literals;
+
+static constexpr hrt_abstime TRY_SUBSCRIBE_INTERVAL{20_ms};	// interval in microseconds at which we try to subscribe to a topic
 // if we haven't succeeded before
 
 namespace px4
@@ -64,17 +70,16 @@ namespace logger
 static constexpr uint8_t MSG_ID_INVALID = UINT8_MAX;
 
 struct LoggerSubscription : public uORB::SubscriptionInterval {
-
-	uint8_t msg_id{MSG_ID_INVALID};
-
 	LoggerSubscription() = default;
 
-	LoggerSubscription(const orb_metadata *meta, uint32_t interval_ms = 0, uint8_t instance = 0) :
-		uORB::SubscriptionInterval(meta, interval_ms * 1000, instance)
+	LoggerSubscription(ORB_ID id, uint32_t interval_ms = 0, uint8_t instance = 0) :
+		uORB::SubscriptionInterval(id, interval_ms * 1000, instance)
 	{}
+
+	uint8_t msg_id{MSG_ID_INVALID};
 };
 
-class Logger : public ModuleBase<Logger>
+class Logger : public ModuleBase<Logger>, public ModuleParams
 {
 public:
 	enum class LogMode {
@@ -158,6 +163,11 @@ private:
 		unsigned min_delta_ms{0};        ///< minimum time between 2 topic writes [ms]
 		unsigned next_write_time{0};     ///< next time to write in 0.1 seconds
 	};
+
+	/**
+	 * @brief Updates and checks for updated uORB parameters.
+	 */
+	void update_params();
 
 	/**
 	 * Write an ADD_LOGGED_MSG to the log for a all current subscriptions and instances
@@ -265,17 +275,20 @@ private:
 	 * This must be called before start_log() (because it does not write an ADD_LOGGED_MSG message).
 	 * @return true on success
 	 */
-	bool initialize_topics(MissionLogType mission_log_mode);
+	bool initialize_topics();
+
+	/**
+	 * Determines if log-from-boot should be disabled, based on the value of SDLOG_BOOT_BAT and the battery status.
+	 * @return true if log-from-boot should be disabled
+	 */
+	bool get_disable_boot_logging();
 
 	/**
 	 * check current arming state or aux channel and start/stop logging if state changed and according to
 	 * configured params.
-	 * @param vehicle_status_sub
-	 * @param manual_control_sp_sub
-	 * @param mission_log_type
 	 * @return true if log started
 	 */
-	bool start_stop_logging(MissionLogType mission_log_type);
+	bool start_stop_logging();
 
 	void handle_vehicle_command_update();
 	void ack_vehicle_command(vehicle_command_s *cmd, uint32_t result);
@@ -297,6 +310,7 @@ private:
 	 */
 	inline void debug_print_buffer(uint32_t &total_bytes, hrt_abstime &timer_start);
 
+	void publish_logger_status();
 
 	uint8_t						*_msg_buffer{nullptr};
 	int						_msg_buffer_len{0};
@@ -329,15 +343,27 @@ private:
 	hrt_abstime					_next_load_print{0}; ///< timestamp when to print the process load
 	PrintLoadReason					_print_load_reason {PrintLoadReason::Preflight};
 
-	uORB::Subscription				_manual_control_sp_sub{ORB_ID(manual_control_setpoint)};
+	uORB::PublicationMulti<logger_status_s>		_logger_status_pub[(int)LogType::Count] { ORB_ID(logger_status), ORB_ID(logger_status) };
+
+	hrt_abstime					_logger_status_last {0};
+	int						_lockstep_component{-1};
+
+	uint32_t					_message_gaps{0};
+
+	uORB::Subscription				_manual_control_setpoint_sub{ORB_ID(manual_control_setpoint)};
 	uORB::Subscription				_vehicle_command_sub{ORB_ID(vehicle_command)};
 	uORB::Subscription				_vehicle_status_sub{ORB_ID(vehicle_status)};
 	uORB::SubscriptionInterval			_log_message_sub{ORB_ID(log_message), 20};
+	uORB::SubscriptionInterval			_parameter_update_sub{ORB_ID(parameter_update), 1_s};
 
-	param_t						_sdlog_profile_handle{PARAM_INVALID};
-	param_t						_log_utc_offset{PARAM_INVALID};
-	param_t						_log_dirs_max{PARAM_INVALID};
-	param_t						_mission_log{PARAM_INVALID};
+	DEFINE_PARAMETERS(
+		(ParamInt<px4::params::SDLOG_UTC_OFFSET>) _param_sdlog_utc_offset,
+		(ParamInt<px4::params::SDLOG_DIRS_MAX>) _param_sdlog_dirs_max,
+		(ParamInt<px4::params::SDLOG_PROFILE>) _param_sdlog_profile,
+		(ParamInt<px4::params::SDLOG_MISSION>) _param_sdlog_mission,
+		(ParamBool<px4::params::SDLOG_BOOT_BAT>) _param_sdlog_boot_bat,
+		(ParamBool<px4::params::SDLOG_UUID>) _param_sdlog_uuid
+	)
 };
 
 } //namespace logger

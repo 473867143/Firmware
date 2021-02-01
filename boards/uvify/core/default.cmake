@@ -12,8 +12,9 @@ px4_add_board(
 		GPS1:/dev/ttyS3
 		TEL1:/dev/ttyS1
 		TEL2:/dev/ttyS2
+		TEL3:/dev/ttyS6
 	DRIVERS
-		adc
+		adc/board_adc
 		barometer/ms5611
 		batt_smbus
 		camera_capture
@@ -21,18 +22,19 @@ px4_add_board(
 		distance_sensor # all available distance sensor drivers
 		dshot
 		gps
-		imu/mpu6000
-		imu/mpu9250
+		imu/invensense/icm20602
+		imu/invensense/icm20608g
+		imu/invensense/mpu9250
 		irlock
 		lights/rgbled_ncp5623c
 		magnetometer/bmm150
 		magnetometer/lis3mdl
-		magnetometer/ist8310
+		magnetometer/isentek/ist8310
 		optical_flow # all available optical flow drivers
 		pca9685
 		pwm_input
 		pwm_out_sim
-		px4fmu
+		pwm_out
 		rc_input
 		tone_alarm
 		uavcan
@@ -44,6 +46,7 @@ px4_add_board(
 		dataman
 		ekf2
 		events
+		flight_mode_manager
 		land_detector
 		landing_target_estimator
 		load_mon
@@ -51,22 +54,24 @@ px4_add_board(
 		logger
 		mavlink
 		mc_att_control
+		mc_hover_thrust_estimator
 		mc_pos_control
 		mc_rate_control
 		navigator
 		rc_update
 		sensors
 		sih
+		temperature_compensation
 		vmount
 	SYSTEMCMDS
 		bl_update
-		config
 		dmesg
 		dumpfile
 		esc_calib
 		hardfault_log
 		i2cdetect
 		led_control
+		mft
 		mixer
 		motor_ramp
 		motor_test
@@ -78,7 +83,7 @@ px4_add_board(
 		reboot
 		reflect
 		sd_bench
-		shutdown
+		system_time
 		top
 		topic_listener
 		tune_control

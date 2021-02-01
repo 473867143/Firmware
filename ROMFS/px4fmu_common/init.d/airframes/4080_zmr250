@@ -5,22 +5,21 @@
 # @type Quadrotor x
 # @class Copter
 #
-# @board px4_fmu-v2 exclude
-# @board intel_aerofc-v1 exclude
-#
 # @maintainer Anton Matosov <anton.matosov@gmail.com>
 #
+# @board px4_fmu-v2 exclude
+# @board intel_aerofc-v1 exclude
+# @board bitcraze_crazyflie exclude
+#
 
-sh /etc/init.d/rc.mc_defaults
+. ${R}etc/init.d/rc.mc_defaults
 
-set MIXER zmr250
+set MIXER quad_x
 set PWM_OUT 1234
 
 if [ $AUTOCNF = yes ]
 then
 	param set CBRK_IO_SAFETY 22027
-
-	param set FAILSAFE 100
 
 	param set MC_ROLL_P 2.2
 	param set MC_ROLLRATE_P 0.06
@@ -40,11 +39,6 @@ then
 	param set MC_ACRO_R_MAX 1000
 	param set MC_ACRO_P_MAX 1000
 	param set MC_ACRO_Y_MAX 1000
-
-	param set MC_TPA_BREAK_P 0.5
-	param set MC_TPA_BREAK_D 0.7
-	param set MC_TPA_RATE_P 0.5
-	param set MC_TPA_RATE_D 0.5
 
 	# param set NAV_RCL_ACT 6 # Lockdown
 

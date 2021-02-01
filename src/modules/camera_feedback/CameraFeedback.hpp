@@ -71,11 +71,11 @@ public:
 	/** @see ModuleBase */
 	static int print_usage(const char *reason = nullptr);
 
-	void Run() override;
-
 	bool init();
 
 private:
+
+	void Run() override;
 
 	uORB::SubscriptionCallbackWorkItem _trigger_sub{this, ORB_ID(camera_trigger)};
 
@@ -83,9 +83,4 @@ private:
 	uORB::Subscription	_att_sub{ORB_ID(vehicle_attitude)};
 
 	uORB::Publication<camera_capture_s>	_capture_pub{ORB_ID(camera_capture)};
-
-	DEFINE_PARAMETERS(
-		(ParamBool<px4::params::CAM_CAP_FBACK>) _param_camera_capture_feedback
-	)
-
 };

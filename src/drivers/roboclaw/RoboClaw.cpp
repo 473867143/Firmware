@@ -51,10 +51,8 @@
 
 #include <systemlib/err.h>
 #include <systemlib/mavlink_log.h>
-#include <arch/board/board.h>
 
 #include <uORB/Publication.hpp>
-#include <uORB/topics/debug_key_value.h>
 #include <drivers/drv_hrt.h>
 #include <math.h>
 

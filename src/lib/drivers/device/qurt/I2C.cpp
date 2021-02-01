@@ -47,17 +47,15 @@
 namespace device
 {
 
-I2C::I2C(const char *name, const char *devname, const int bus, const uint16_t address, const uint32_t frequency) :
-	CDev(name, devname),
+I2C::I2C(uint8_t device_type, const char *name, const int bus, const uint16_t address, const uint32_t frequency) :
+	CDev(name, nullptr),
 	_frequency(frequency)
 {
-	DEVICE_DEBUG("I2C::I2C name = %s devname = %s", name, devname);
 	// fill in _device_id fields for a I2C device
+	_device_id.devid_s.devtype = device_type;
 	_device_id.devid_s.bus_type = DeviceBusType_I2C;
 	_device_id.devid_s.bus = bus;
 	_device_id.devid_s.address = address;
-	// devtype needs to be filled in by the driver
-	_device_id.devid_s.devtype = 0;
 }
 
 I2C::~I2C()
@@ -75,7 +73,7 @@ I2C::init()
 
 	// Open the actual I2C device
 	char dev_path[16] {};
-	snprintf(dev_path, sizeof(dev_path), "/dev/iic-%i", get_device_bus());
+	snprintf(dev_path, sizeof(dev_path), DEV_FS_I2C_DEVICE_TYPE_STRING"%i", get_device_bus());
 	_fd = ::open(dev_path, O_RDWR);
 
 	if (_fd < 0) {
@@ -101,7 +99,7 @@ I2C::init()
 	}
 
 	// tell the world where we are
-	DEVICE_LOG("on I2C bus %d at 0x%02x", get_device_bus(), get_device_address());
+	DEVICE_DEBUG("on I2C bus %d at 0x%02x", get_device_bus(), get_device_address());
 
 out:
 

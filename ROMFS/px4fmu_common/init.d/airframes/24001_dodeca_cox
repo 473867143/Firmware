@@ -22,6 +22,9 @@
 # @maintainer Ian McNanie <ianmcnanie@gmail.com>
 # @maintainer William Peale <develop707@gmail.com>
 #
+# @board intel_aerofc-v1 exclude
+# @board bitcraze_crazyflie exclude
+#
 
 set VEHICLE_TYPE mc
 
@@ -39,7 +42,6 @@ then
 	param set PWM_RATE 400
 
 	param set RTL_DESCEND_ALT 10
-	param set RTL_LAND_DELAY 0
 	param set RTL_RETURN_ALT 30
 fi
 

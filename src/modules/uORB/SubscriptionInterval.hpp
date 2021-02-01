@@ -47,6 +47,8 @@
 
 #include "Subscription.hpp"
 
+#include <mathlib/mathlib.h>
+
 namespace uORB
 {
 
@@ -54,6 +56,18 @@ namespace uORB
 class SubscriptionInterval
 {
 public:
+
+	/**
+	 * Constructor
+	 *
+	 * @param id The uORB ORB_ID enum for the topic.
+	 * @param interval The requested maximum update interval in microseconds.
+	 * @param instance The instance for multi sub.
+	 */
+	SubscriptionInterval(ORB_ID id, uint32_t interval_us = 0, uint8_t instance = 0) :
+		_subscription{id, instance},
+		_interval_us(interval_us)
+	{}
 
 	/**
 	 * Constructor
@@ -72,6 +86,7 @@ public:
 	~SubscriptionInterval() = default;
 
 	bool subscribe() { return _subscription.subscribe(); }
+	void unsubscribe() { _subscription.unsubscribe(); }
 
 	bool advertised() { return _subscription.advertised(); }
 
@@ -109,7 +124,9 @@ public:
 	bool copy(void *dst)
 	{
 		if (_subscription.copy(dst)) {
-			_last_update = hrt_absolute_time();
+			const hrt_abstime now = hrt_absolute_time();
+			// shift last update time forward, but don't let it get further behind than the interval
+			_last_update = math::constrain(_last_update + _interval_us, now - _interval_us, now);
 			return true;
 		}
 
@@ -119,6 +136,8 @@ public:
 	bool		valid() const { return _subscription.valid(); }
 
 	uint8_t		get_instance() const { return _subscription.get_instance(); }
+	uint32_t        get_interval_us() const { return _interval_us; }
+	unsigned	get_last_generation() const { return _subscription.get_last_generation(); }
 	orb_id_t	get_topic() const { return _subscription.get_topic(); }
 
 	/**

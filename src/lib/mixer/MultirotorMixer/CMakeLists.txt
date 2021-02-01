@@ -48,6 +48,7 @@ set(geometry_files
 	quad_s250aq.toml
 	quad_vtail.toml
 	quad_wide.toml
+	quad_x_cw.toml
 	quad_x.toml
 	quad_x_pusher.toml
 	quad_y.toml
@@ -91,7 +92,7 @@ add_library(MultirotorMixer
 	${CMAKE_CURRENT_BINARY_DIR}/mixer_multirotor_normalized.generated.h
 	${CMAKE_CURRENT_BINARY_DIR}/mixer_multirotor_6dof.generated.h
 )
-target_link_libraries(MultirotorMixer PRIVATE Mixer)
+target_link_libraries(MultirotorMixer PRIVATE MixerBase)
 target_include_directories(MultirotorMixer PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 add_dependencies(MultirotorMixer mixer_gen mixer_gen_6dof prebuild_targets)
 
@@ -103,7 +104,7 @@ if(BUILD_TESTING)
 	)
 	target_compile_definitions(test_mixer_multirotor PRIVATE MIXER_MULTIROTOR_USE_MOCK_GEOMETRY)
 	target_compile_options(test_mixer_multirotor PRIVATE -Wno-unused-result)
-	target_link_libraries(test_mixer_multirotor PRIVATE Mixer)
+	target_link_libraries(test_mixer_multirotor PRIVATE MixerBase)
 
 	add_test(NAME mixer_multirotor
 		COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/mixer_multirotor.py --test --mixer-multirotor-binary $<TARGET_FILE:test_mixer_multirotor>

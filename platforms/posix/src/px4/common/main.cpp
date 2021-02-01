@@ -62,6 +62,10 @@
 #include <sys/file.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+#if (_POSIX_MEMLOCK > 0)
+#include <sys/mman.h>
+#endif
 
 #include <px4_platform_common/time.h>
 #include <px4_platform_common/log.h>
@@ -71,7 +75,6 @@
 #include <px4_platform_common/posix.h>
 
 #include "apps.h"
-#include "DriverFramework.hpp"
 #include "px4_daemon/client.h"
 #include "px4_daemon/server.h"
 #include "px4_daemon/pxh.h"
@@ -94,7 +97,6 @@ void init_once();
 }
 
 static void sig_int_handler(int sig_num);
-static void sig_fpe_handler(int sig_num);
 
 static void register_sig_handler();
 static void set_cpu_scaling();
@@ -176,6 +178,22 @@ int main(int argc, char **argv)
 		return client.process_args(argc, (const char **)argv);
 
 	} else {
+#if (_POSIX_MEMLOCK > 0) && !defined(ENABLE_LOCKSTEP_SCHEDULER)
+
+		// try to lock address space into RAM, to avoid page swap delay
+		// TODO: Check CAP_IPC_LOCK instead of euid
+		if (geteuid() == 0) {   // root user
+			if (mlockall(MCL_CURRENT | MCL_FUTURE)) {	// check if both works
+				PX4_ERR("mlockall() failed! errno: %d (%s)", errno, strerror(errno));
+				munlockall();	// avoid mlock limitation caused alloc failure in future
+
+			} else {
+				PX4_INFO("mlockall() enabled. PX4's virtual address space is locked into RAM.");
+			}
+		}
+
+#endif // (_POSIX_MEMLOCK > 0) && !ENABLE_LOCKSTEP_SCHEDULER
+
 		/* Server/daemon apps need to parse the command line arguments. */
 
 		std::string data_path{};
@@ -281,8 +299,6 @@ int main(int argc, char **argv)
 			return ret;
 		}
 
-		DriverFramework::Framework::initialize();
-
 		px4::init_once();
 		px4::init(argc, argv, "px4");
 
@@ -355,7 +371,7 @@ int create_symlinks_if_needed(std::string &data_path)
 
 	}
 
-	PX4_INFO("Creating symlink %s -> %s", src_path.c_str(), dest_path.c_str());
+	PX4_INFO_RAW("Creating symlink %s -> %s\n", src_path.c_str(), dest_path.c_str());
 
 	// create sym-link
 	int ret = symlink(src_path.c_str(), dest_path.c_str());
@@ -407,11 +423,6 @@ void register_sig_handler()
 	sig_int.sa_handler = sig_int_handler;
 	sig_int.sa_flags = 0;// not SA_RESTART!
 
-	// SIGFPE
-	struct sigaction sig_fpe {};
-	sig_fpe.sa_handler = sig_fpe_handler;
-	sig_fpe.sa_flags = 0;// not SA_RESTART!
-
 	// SIGPIPE
 	// We want to ignore if a PIPE has been closed.
 	struct sigaction sig_pipe {};
@@ -426,7 +437,6 @@ void register_sig_handler()
 #endif
 
 	sigaction(SIGTERM, &sig_int, nullptr);
-	sigaction(SIGFPE, &sig_fpe, nullptr);
 	sigaction(SIGPIPE, &sig_pipe, nullptr);
 }
 
@@ -434,15 +444,6 @@ void sig_int_handler(int sig_num)
 {
 	fflush(stdout);
 	printf("\nPX4 Exiting...\n");
-	fflush(stdout);
-	px4_daemon::Pxh::stop();
-	_exit_requested = true;
-}
-
-void sig_fpe_handler(int sig_num)
-{
-	fflush(stdout);
-	printf("\nfloating point exception\n");
 	fflush(stdout);
 	px4_daemon::Pxh::stop();
 	_exit_requested = true;

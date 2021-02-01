@@ -20,7 +20,7 @@ px4_add_board(
 		TEL4:/dev/ttyS6
 
 	DRIVERS
-		adc
+		adc/board_adc
 		#barometer # all available barometer drivers
 		barometer/ms5611
 		#batt_smbus
@@ -35,8 +35,7 @@ px4_add_board(
 		#imu # all available imu drivers
 		imu/l3gd20
 		imu/lsm303d
-		imu/mpu6000
-		#imu/mpu9250
+		imu/invensense/mpu6000
 		#iridiumsbd
 		irlock
 		#lights/blinkm
@@ -50,7 +49,7 @@ px4_add_board(
 		#protocol_splitter
 		#pwm_input
 		pwm_out_sim
-		px4fmu
+		pwm_out
 		px4io
 		#tap_esc
 		#telemetry # all available telemetry drivers
@@ -65,6 +64,7 @@ px4_add_board(
 		dataman
 		#ekf2
 		events
+		flight_mode_manager
 		#fw_att_control
 		#fw_pos_control_l1
 		#rover_pos_control
@@ -81,18 +81,19 @@ px4_add_board(
 		battery_status
 		rc_update
 		sensors
+		temperature_compensation
 		vmount
 		#vtol_att_control
 		#airspeed_selector
 
 	SYSTEMCMDS
 		bl_update
-		#config
 		#dumpfile
 		#esc_calib
 		hardfault_log
 		i2cdetect
 		#led_control
+		mft
 		mixer
 		#motor_ramp
 		motor_test
@@ -111,7 +112,6 @@ px4_add_board(
 		work_queue
 
 	EXAMPLES
-		#bottle_drop # OBC challenge
 		#fixedwing_control # Tutorial code from https://px4.io/dev/example_fixedwing_control
 		#hello
 		#hwtest # Hardware test

@@ -3,7 +3,9 @@ px4_add_board(
 	PLATFORM posix
 	VENDOR px4
 	MODEL sitl
+	ROMFSROOT px4fmu_common
 	LABEL default
+	EMBEDDED_METADATA parameters
 	TESTING
 	DRIVERS
 		#barometer # all available barometer drivers
@@ -15,11 +17,14 @@ px4_add_board(
 		gps
 		#imu # all available imu drivers
 		#magnetometer # all available magnetometer drivers
+		#protocol_splitter
 		pwm_out_sim
+		rpm/rpm_simulator
 		#telemetry # all available telemetry drivers
 		tone_alarm
 		#uavcan
 	MODULES
+		airship_att_control
 		airspeed_selector
 		attitude_estimator_q
 		camera_feedback
@@ -27,6 +32,7 @@ px4_add_board(
 		dataman
 		ekf2
 		events
+		flight_mode_manager
 		fw_att_control
 		fw_pos_control_l1
 		land_detector
@@ -36,8 +42,10 @@ px4_add_board(
 		logger
 		mavlink
 		mc_att_control
+		mc_hover_thrust_estimator
 		mc_pos_control
 		mc_rate_control
+		#micrortps_bridge
 		navigator
 		rc_update
 		replay
@@ -45,14 +53,17 @@ px4_add_board(
 		sensors
 		#sih
 		simulator
+		temperature_compensation
+		uuv_att_control
 		vmount
 		vtol_att_control
 	SYSTEMCMDS
-		#config
 		#dumpfile
 		dyn
 		esc_calib
+		failure
 		led_control
+		#mft
 		mixer
 		motor_ramp
 		motor_test
@@ -61,18 +72,18 @@ px4_add_board(
 		param
 		perf
 		pwm
-		reboot
 		sd_bench
 		shutdown
+		system_time
 		tests # tests and test runner
-		top
+		#top
 		topic_listener
 		tune_control
 		ver
 		work_queue
 	EXAMPLES
-		bottle_drop # OBC challenge
 		dyn_hello # dynamically loading modules example
+		fake_magnetometer
 		fixedwing_control # Tutorial code from https://px4.io/dev/example_fixedwing_control
 		hello
 		#hwtest # Hardware test
@@ -81,6 +92,7 @@ px4_add_board(
 		px4_simple_app # Tutorial code from http://dev.px4.io/en/apps/hello_sky.html
 		rover_steering_control # Rover example app
 		uuv_example_app
+		work_item
 	)
 
 set(config_sitl_viewer jmavsim CACHE STRING "viewer for sitl")

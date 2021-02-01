@@ -43,6 +43,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
+
 #include "dev_fs_lib_spi.h"
 
 #include <px4_platform_common/px4_config.h>
@@ -50,20 +51,17 @@
 namespace device
 {
 
-SPI::SPI(const char *name, const char *devname, int bus, uint32_t device, enum spi_mode_e mode, uint32_t frequency) :
-	CDev(name, devname),
+SPI::SPI(uint8_t device_type, const char *name, int bus, uint32_t device, enum spi_mode_e mode, uint32_t frequency) :
+	CDev(name, nullptr),
 	_device(device),
 	_mode(mode),
 	_frequency(frequency)
 {
-	DEVICE_DEBUG("SPI::SPI name = %s devname = %s", name, devname);
-
+	_device_id.devid_s.devtype = device_type;
 	// fill in _device_id fields for a SPI device
 	_device_id.devid_s.bus_type = DeviceBusType_SPI;
 	_device_id.devid_s.bus = bus;
 	_device_id.devid_s.address = (uint8_t)device;
-	// devtype needs to be filled in by the driver
-	_device_id.devid_s.devtype = 0;
 }
 
 SPI::~SPI()
@@ -79,7 +77,7 @@ SPI::init()
 {
 	// Open the actual SPI device
 	char dev_path[16];
-	snprintf(dev_path, sizeof(dev_path), "dev/spi-%lu", PX4_SPI_DEV_ID(_device));
+	snprintf(dev_path, sizeof(dev_path), DEV_FS_SPI_DEVICE_TYPE_STRING"%lu", PX4_SPI_DEV_ID(_device));
 	DEVICE_DEBUG("%s", dev_path);
 	_fd = ::open(dev_path, O_RDWR);
 
@@ -104,8 +102,8 @@ SPI::init()
 		return ret;
 	}
 
-	/* tell the workd where we are */
-	DEVICE_LOG("on SPI bus %d at %d (%u KHz)", get_device_bus(), PX4_SPI_DEV_ID(_device), _frequency / 1000);
+	/* tell the world where we are */
+	DEVICE_DEBUG("on SPI bus %d at %d (%u KHz)", get_device_bus(), PX4_SPI_DEV_ID(_device), _frequency / 1000);
 
 	return PX4_OK;
 }
@@ -117,7 +115,29 @@ SPI::transfer(uint8_t *send, uint8_t *recv, unsigned len)
 		return -EINVAL;
 	}
 
+	// set bus frequency
+	dspal_spi_ioctl_set_bus_frequency bus_freq{};
+
+	bus_freq.bus_frequency_in_hz = _frequency;
+
+	if (::ioctl(_fd, SPI_IOCTL_SET_BUS_FREQUENCY_IN_HZ, &bus_freq) < 0) {
+		PX4_ERR("setting bus frequency failed");
+		return PX4_ERROR;
+	}
+
+	// set bus mode
+	// dspal_spi_ioctl_set_spi_mode bus_mode{};
+	// bus_mode.eClockPolarity = SPI_CLOCK_IDLE_HIGH;
+	// bus_mode.eShiftMode = SPI_OUTPUT_FIRST;
+
+	// if (::ioctl(spi_fildes, SPI_IOCTL_SET_SPI_MODE, &bus_mode) < 0) {
+	// 	PX4_ERR("setting mode failed");
+	// 	return PX4_ERROR;
+	// }
+
+	// transfer data
 	dspal_spi_ioctl_read_write ioctl_write_read{};
+
 	ioctl_write_read.read_buffer = send;
 	ioctl_write_read.read_buffer_length = len;
 	ioctl_write_read.write_buffer = recv;
@@ -127,10 +147,10 @@ SPI::transfer(uint8_t *send, uint8_t *recv, unsigned len)
 
 	if (result < 0) {
 		PX4_ERR("transfer error %d", result);
-		return result;
+		return PX4_ERROR;
 	}
 
-	return result;
+	return PX4_OK;
 }
 
 int
@@ -140,15 +160,28 @@ SPI::transferhword(uint16_t *send, uint16_t *recv, unsigned len)
 		return -EINVAL;
 	}
 
-	// int bits = 16;
-	// result = ::ioctl(_fd, SPI_IOC_WR_BITS_PER_WORD, &bits);
+	// set bus frequency
+	dspal_spi_ioctl_set_bus_frequency bus_freq{};
+	bus_freq.bus_frequency_in_hz = _frequency;
 
-	// if (result == -1) {
-	// 	PX4_ERR("can’t set 16 bit spi mode");
+	if (::ioctl(_fd, SPI_IOCTL_SET_BUS_FREQUENCY_IN_HZ, &bus_freq) < 0) {
+		PX4_ERR("setting bus frequency failed");
+		return PX4_ERROR;
+	}
+
+	// set bus mode
+	// dspal_spi_ioctl_set_spi_mode bus_mode{};
+	// bus_mode.eClockPolarity = SPI_CLOCK_IDLE_HIGH;
+	// bus_mode.eShiftMode = SPI_OUTPUT_FIRST;
+
+	// if (::ioctl(spi_fildes, SPI_IOCTL_SET_SPI_MODE, &bus_mode) < 0) {
+	// 	PX4_ERR("setting mode failed");
 	// 	return PX4_ERROR;
 	// }
 
+	// transfer data
 	dspal_spi_ioctl_read_write ioctl_write_read{};
+
 	ioctl_write_read.read_buffer = send;
 	ioctl_write_read.read_buffer_length = len * 2;
 	ioctl_write_read.write_buffer = recv;
@@ -158,10 +191,10 @@ SPI::transferhword(uint16_t *send, uint16_t *recv, unsigned len)
 
 	if (result < 0) {
 		PX4_ERR("transfer error %d", result);
-		return result;
+		return PX4_ERROR;
 	}
 
-	return result;
+	return PX4_OK;
 }
 
 } // namespace device

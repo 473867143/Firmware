@@ -1,3 +1,6 @@
+add_definitions(
+	-D__PX4_LINUX
+)
 
 px4_add_board(
 	VENDOR aerotenna
@@ -5,6 +8,7 @@ px4_add_board(
 	LABEL default
 	PLATFORM posix
 	ARCHITECTURE cortex-a9
+	ROMFSROOT px4fmu_common
 	TOOLCHAIN arm-linux-gnueabihf
 	TESTING
 	SERIAL_PORTS
@@ -24,17 +28,14 @@ px4_add_board(
 		differential_pressure # all available differential pressure drivers
 		distance_sensor # all available distance sensor drivers
 		gps
-		#imu # all available imu drivers
-		imu/mpu9250
+		imu/invensense/mpu9250
 		lights/rgbled
 		linux_pwm_out
-		linux_sbus
 		#magnetometer # all available magnetometer drivers
 		magnetometer/hmc5883
 		pwm_out_sim
+		rc_input
 		#telemetry # all available telemetry drivers
-	DF_DRIVERS # NOTE: DriverFramework is migrating to intree PX4 drivers
-		mpu9250
 	MODULES
 		airspeed_selector
 		attitude_estimator_q
@@ -44,6 +45,7 @@ px4_add_board(
 		dataman
 		ekf2
 		events
+		flight_mode_manager
 		fw_att_control
 		fw_pos_control_l1
 		land_detector
@@ -53,6 +55,7 @@ px4_add_board(
 		logger
 		mavlink
 		mc_att_control
+		mc_hover_thrust_estimator
 		mc_pos_control
 		mc_rate_control
 		#micrortps_bridge
@@ -62,6 +65,7 @@ px4_add_board(
 		sensors
 		sih
 		#simulator
+		temperature_compensation
 		vmount
 		vtol_att_control
 	SYSTEMCMDS
@@ -72,17 +76,16 @@ px4_add_board(
 		param
 		perf
 		pwm
-		reboot
 		sd_bench
+		system_time
 		shutdown
 		tests # tests and test runner
-		top
+		#top
 		topic_listener
 		tune_control
 		ver
 		work_queue
 	EXAMPLES
-		bottle_drop # OBC challenge
 		fixedwing_control # Tutorial code from https://px4.io/dev/example_fixedwing_control
 		hello
 		#hwtest # Hardware test

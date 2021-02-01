@@ -32,9 +32,6 @@ add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-std=gnu++11>)
 add_definitions(
 	-D__PX4_POSIX_EAGLE
 	-D__PX4_LINUX
-
-	# For DriverFramework
-	-D__DF_LINUX
 )
 
 px4_add_board(
@@ -44,6 +41,7 @@ px4_add_board(
 	LABEL default
 	#TESTING
 	TOOLCHAIN arm-linux-gnueabihf
+	ROMFSROOT px4fmu_common
 	DRIVERS
 		#barometer # all available barometer drivers
 		batt_smbus
@@ -53,10 +51,10 @@ px4_add_board(
 		gps
 		#imu # all available imu drivers
 		#lights/rgbled
-		linux_sbus
 		#magnetometer # all available magnetometer drivers
 		pwm_out_sim
 		qshell/posix
+		rc_input
 		#telemetry # all available telemetry drivers
 	MODULES
 		airspeed_selector
@@ -66,15 +64,17 @@ px4_add_board(
 		dataman
 		ekf2
 		events
+		flight_mode_manager
 		fw_att_control
 		fw_pos_control_l1
 		land_detector
 		landing_target_estimator
-		load_mon
+		#load_mon
 		local_position_estimator
 		logger
 		mavlink
 		mc_att_control
+		mc_hover_thrust_estimator
 		mc_pos_control
 		mc_rate_control
 		#micrortps_bridge
@@ -85,12 +85,12 @@ px4_add_board(
 		rover_pos_control
 		sensors
 		#sih
+		temperature_compensation
 		simulator
 		vmount
 		vtol_att_control
 	SYSTEMCMDS
 		#bl_update
-		#config
 		#dumpfile
 		esc_calib
 		#hardfault_log
@@ -103,17 +103,16 @@ px4_add_board(
 		param
 		perf
 		pwm
-		reboot
 		sd_bench
 		shutdown
+		system_time
 		#tests # tests and test runner
-		top
+		#top
 		topic_listener
 		tune_control
 		ver
 		work_queue
 	EXAMPLES
-		#bottle_drop # OBC challenge
 		#fixedwing_control # Tutorial code from https://px4.io/dev/example_fixedwing_control
 		#hello
 		#hwtest # Hardware test
@@ -122,4 +121,5 @@ px4_add_board(
 		#px4_simple_app # Tutorial code from http://dev.px4.io/en/apps/hello_sky.html
 		#rover_steering_control # Rover example app
 		#uuv_example_app
+		#work_item
 	)

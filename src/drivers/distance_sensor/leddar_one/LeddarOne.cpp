@@ -33,20 +33,33 @@
 
 #include "LeddarOne.hpp"
 
+#include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include <lib/drivers/device/Device.hpp>
+
 LeddarOne::LeddarOne(const char *serial_port, uint8_t device_orientation):
 	ScheduledWorkItem(MODULE_NAME, px4::serial_port_to_wq(serial_port)),
-	_px4_rangefinder(0 /* device id not yet used */, ORB_PRIO_DEFAULT, device_orientation)
+	_px4_rangefinder(0, device_orientation)
 {
 	_serial_port = strdup(serial_port);
 
-	_px4_rangefinder.set_device_type(distance_sensor_s::MAV_DISTANCE_SENSOR_LASER);
+	device::Device::DeviceId device_id;
+	device_id.devid_s.bus_type = device::Device::DeviceBusType::DeviceBusType_SERIAL;
+
+	uint8_t bus_num = atoi(&_serial_port[strlen(_serial_port) - 1]); // Assuming '/dev/ttySx'
+
+	if (bus_num < 10) {
+		device_id.devid_s.bus = bus_num;
+	}
+
+	_px4_rangefinder.set_device_id(device_id.devid);
+	_px4_rangefinder.set_device_type(DRV_DIST_DEVTYPE_LEDDARONE);
+
 	_px4_rangefinder.set_max_distance(LEDDAR_ONE_MAX_DISTANCE);
 	_px4_rangefinder.set_min_distance(LEDDAR_ONE_MIN_DISTANCE);
 	_px4_rangefinder.set_fov(LEDDAR_ONE_FIELD_OF_VIEW);
-	_px4_rangefinder.set_orientation(device_orientation);
 }
 
 LeddarOne::~LeddarOne()
@@ -268,8 +281,6 @@ LeddarOne::print_info()
 {
 	perf_print_counter(_comms_error);
 	perf_print_counter(_sample_perf);
-
-	_px4_rangefinder.print_status();
 }
 
 void

@@ -48,6 +48,7 @@
 #include <perf/perf_counter.h>
 #include <px4_platform_common/module_params.h>
 #include <uORB/Subscription.hpp>
+#include <uORB/SubscriptionInterval.hpp>
 #include <uORB/topics/actuator_controls.h>
 #include <uORB/topics/actuator_outputs.h>
 #include <uORB/topics/actuator_armed.h>
@@ -77,6 +78,8 @@
 #if !defined(TAP_ESC_CTRL_UORB_UPDATE_INTERVAL)
 #  define TAP_ESC_CTRL_UORB_UPDATE_INTERVAL 2  // [ms] min: 2, max: 100
 #endif
+
+using namespace time_literals;
 
 /*
  * This driver connects to TAP ESCs via serial.
@@ -115,7 +118,7 @@ private:
 	int			_armed_sub = -1;
 	int 			_test_motor_sub = -1;
 
-	uORB::Subscription	_parameter_update_sub{ORB_ID(parameter_update)};
+	uORB::SubscriptionInterval _parameter_update_sub{ORB_ID(parameter_update), 1_s};
 
 	orb_advert_t        	_outputs_pub = nullptr;
 	actuator_outputs_s      _outputs = {};
@@ -156,7 +159,7 @@ const uint8_t TAP_ESC::_device_mux_map[TAP_ESC_MAX_MOTOR_NUM] = ESC_POS;
 const uint8_t TAP_ESC::_device_dir_map[TAP_ESC_MAX_MOTOR_NUM] = ESC_DIR;
 
 TAP_ESC::TAP_ESC(char const *const device, uint8_t channels_count):
-	CDev(TAP_ESC_DEVICE_PATH),
+	CDev(nullptr),
 	ModuleParams(nullptr),
 	_perf_control_latency(perf_alloc(PC_ELAPSED, "tap_esc control latency")),
 	_channels_count(channels_count)
@@ -573,6 +576,8 @@ void TAP_ESC::cycle()
 					_esc_feedback.esc_connectiontype = esc_status_s::ESC_CONNECTION_TYPE_SERIAL;
 					_esc_feedback.counter++;
 					_esc_feedback.esc_count = num_outputs;
+					_esc_feedback.esc_online_flags = (1 << num_outputs) - 1;
+					_esc_feedback.esc_armed_flags = (1 << num_outputs) - 1;
 
 					_esc_feedback.timestamp = hrt_absolute_time();
 
@@ -637,12 +642,7 @@ int TAP_ESC::control_callback(uint8_t control_group, uint8_t control_index, floa
 	input = _controls[control_group].control[control_index];
 
 	/* limit control input */
-	if (input > 1.0f) {
-		input = 1.0f;
-
-	} else if (input < -1.0f) {
-		input = -1.0f;
-	}
+	input = math::constrain(input, -1.f, 1.f);
 
 	/* throttle not arming - mark throttle input as invalid */
 	if (_armed.prearmed && !_armed.armed) {

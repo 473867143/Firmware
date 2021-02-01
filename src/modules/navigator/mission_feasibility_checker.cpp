@@ -58,6 +58,11 @@ MissionFeasibilityChecker::checkMissionFeasible(const mission_s &mission,
 		float max_distance_to_1st_waypoint, float max_distance_between_waypoints,
 		bool land_start_req)
 {
+	// trivial case: A mission with length zero cannot be valid
+	if ((int)mission.count <= 0) {
+		return false;
+	}
+
 	bool failed = false;
 	bool warned = false;
 
@@ -242,6 +247,7 @@ MissionFeasibilityChecker::checkMissionItemValidity(const mission_s &mission)
 		    missionitem.nav_cmd != NAV_CMD_VTOL_TAKEOFF &&
 		    missionitem.nav_cmd != NAV_CMD_VTOL_LAND &&
 		    missionitem.nav_cmd != NAV_CMD_DELAY &&
+		    missionitem.nav_cmd != NAV_CMD_CONDITION_GATE &&
 		    missionitem.nav_cmd != NAV_CMD_DO_JUMP &&
 		    missionitem.nav_cmd != NAV_CMD_DO_CHANGE_SPEED &&
 		    missionitem.nav_cmd != NAV_CMD_DO_SET_HOME &&
@@ -253,6 +259,7 @@ MissionFeasibilityChecker::checkMissionItemValidity(const mission_s &mission)
 		    missionitem.nav_cmd != NAV_CMD_IMAGE_STOP_CAPTURE &&
 		    missionitem.nav_cmd != NAV_CMD_VIDEO_START_CAPTURE &&
 		    missionitem.nav_cmd != NAV_CMD_VIDEO_STOP_CAPTURE &&
+		    missionitem.nav_cmd != NAV_CMD_DO_CONTROL_VIDEO &&
 		    missionitem.nav_cmd != NAV_CMD_DO_MOUNT_CONFIGURE &&
 		    missionitem.nav_cmd != NAV_CMD_DO_MOUNT_CONTROL &&
 		    missionitem.nav_cmd != NAV_CMD_DO_SET_ROI &&
@@ -260,8 +267,10 @@ MissionFeasibilityChecker::checkMissionItemValidity(const mission_s &mission)
 		    missionitem.nav_cmd != NAV_CMD_DO_SET_ROI_WPNEXT_OFFSET &&
 		    missionitem.nav_cmd != NAV_CMD_DO_SET_ROI_NONE &&
 		    missionitem.nav_cmd != NAV_CMD_DO_SET_CAM_TRIGG_DIST &&
+		    missionitem.nav_cmd != NAV_CMD_OBLIQUE_SURVEY &&
 		    missionitem.nav_cmd != NAV_CMD_DO_SET_CAM_TRIGG_INTERVAL &&
 		    missionitem.nav_cmd != NAV_CMD_SET_CAMERA_MODE &&
+		    missionitem.nav_cmd != NAV_CMD_SET_CAMERA_ZOOM &&
 		    missionitem.nav_cmd != NAV_CMD_DO_VTOL_TRANSITION) {
 
 			mavlink_log_critical(_navigator->get_mavlink_log_pub(), "Mission rejected: item %i: unsupported cmd: %d", (int)(i + 1),
@@ -377,6 +386,7 @@ MissionFeasibilityChecker::checkTakeoff(const mission_s &mission, float home_alt
 					  missionitem.nav_cmd != NAV_CMD_IMAGE_STOP_CAPTURE &&
 					  missionitem.nav_cmd != NAV_CMD_VIDEO_START_CAPTURE &&
 					  missionitem.nav_cmd != NAV_CMD_VIDEO_STOP_CAPTURE &&
+					  missionitem.nav_cmd != NAV_CMD_DO_CONTROL_VIDEO &&
 					  missionitem.nav_cmd != NAV_CMD_DO_MOUNT_CONFIGURE &&
 					  missionitem.nav_cmd != NAV_CMD_DO_MOUNT_CONTROL &&
 					  missionitem.nav_cmd != NAV_CMD_DO_SET_ROI &&
@@ -384,8 +394,10 @@ MissionFeasibilityChecker::checkTakeoff(const mission_s &mission, float home_alt
 					  missionitem.nav_cmd != NAV_CMD_DO_SET_ROI_WPNEXT_OFFSET &&
 					  missionitem.nav_cmd != NAV_CMD_DO_SET_ROI_NONE &&
 					  missionitem.nav_cmd != NAV_CMD_DO_SET_CAM_TRIGG_DIST &&
+					  missionitem.nav_cmd != NAV_CMD_OBLIQUE_SURVEY &&
 					  missionitem.nav_cmd != NAV_CMD_DO_SET_CAM_TRIGG_INTERVAL &&
 					  missionitem.nav_cmd != NAV_CMD_SET_CAMERA_MODE &&
+					  missionitem.nav_cmd != NAV_CMD_SET_CAMERA_ZOOM &&
 					  missionitem.nav_cmd != NAV_CMD_DO_VTOL_TRANSITION);
 		}
 	}
@@ -568,7 +580,7 @@ MissionFeasibilityChecker::checkVTOLLanding(const mission_s &mission, bool land_
 			}
 		}
 
-		if (missionitem.nav_cmd == NAV_CMD_LAND) {
+		if (missionitem.nav_cmd == NAV_CMD_LAND || missionitem.nav_cmd == NAV_CMD_VTOL_LAND) {
 			mission_item_s missionitem_previous {};
 
 			if (i > 0) {
@@ -666,6 +678,7 @@ MissionFeasibilityChecker::checkDistancesBetweenWaypoints(const mission_s &missi
 
 	double last_lat = (double)NAN;
 	double last_lon = (double)NAN;
+	int last_cmd = 0;
 
 	/* Go through all waypoints */
 	for (size_t i = 0; i < mission.count; i++) {
@@ -691,11 +704,29 @@ MissionFeasibilityChecker::checkDistancesBetweenWaypoints(const mission_s &missi
 					mission_item.lat, mission_item.lon,
 					last_lat, last_lon);
 
+
 			if (dist_between_waypoints > max_distance) {
-				/* item is too far from home */
+				/* distance between waypoints is too high */
 				mavlink_log_critical(_navigator->get_mavlink_log_pub(),
 						     "Distance between waypoints too far: %d meters, %d max.",
 						     (int)dist_between_waypoints, (int)max_distance);
+
+				_navigator->get_mission_result()->warning = true;
+				return false;
+
+				/* do not allow waypoints that are literally on top of each other */
+
+				/* and do not allow condition gates that are at the same position as a navigation waypoint */
+
+			} else if (dist_between_waypoints < 0.05f &&
+				   (mission_item.nav_cmd == NAV_CMD_CONDITION_GATE || last_cmd == NAV_CMD_CONDITION_GATE)) {
+
+				/* Waypoints and gate are at the exact same position, which indicates an
+				 * invalid mission and makes calculating the direction from one waypoint
+				 * to another impossible. */
+				mavlink_log_critical(_navigator->get_mavlink_log_pub(),
+						     "Distance between waypoint and gate too close: %d meters",
+						     (int)dist_between_waypoints);
 
 				_navigator->get_mission_result()->warning = true;
 				return false;
@@ -704,6 +735,7 @@ MissionFeasibilityChecker::checkDistancesBetweenWaypoints(const mission_s &missi
 
 		last_lat = mission_item.lat;
 		last_lon = mission_item.lon;
+		last_cmd = mission_item.nav_cmd;
 	}
 
 	/* We ran through all waypoints and have not found any distances between waypoints that are too far. */

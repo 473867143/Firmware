@@ -50,11 +50,13 @@ endif()
 
 add_library(px4_layer
 	px4_posix_impl.cpp
-	px4_posix_tasks.cpp
+	tasks.cpp
 	px4_sem.cpp
 	px4_init.cpp
 	lib_crc32.c
 	drv_hrt.cpp
+	cpuload.cpp
+	print_load.cpp
 	${SHMEM_SRCS}
 )
 target_compile_definitions(px4_layer PRIVATE MODULE_NAME="px4")

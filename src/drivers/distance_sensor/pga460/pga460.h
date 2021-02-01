@@ -382,7 +382,7 @@ private:
 	/** @orb_advert_t orb_advert_t uORB advertisement topic. */
 	orb_advert_t _distance_sensor_topic{nullptr};
 
-	/** @param _fd Returns the file descriptor from px4_open(). */
+	/** @param _fd Returns the file descriptor from open(). */
 	int _fd{-1};
 
 	/** @param _port Stores the port name. */
@@ -402,6 +402,8 @@ private:
 
 	/** @param _start_loop The starting value for the loop time of the main loop. */
 	uint64_t _start_loop{0};
+
+	device::Device::DeviceId _device_id;
 };
 
 #endif

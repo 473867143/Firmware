@@ -183,6 +183,10 @@ int px4_arch_adc_init(uint32_t base_address)
 		}
 	}
 
+	/* Read out result, clear EOC */
+
+	(void) rDR(base_address);
+
 	return 0;
 }
 
@@ -222,6 +226,11 @@ uint32_t px4_arch_adc_sample(uint32_t base_address, unsigned channel)
 	px4_leave_critical_section(flags);
 
 	return result;
+}
+
+float px4_arch_adc_reference_v()
+{
+	return BOARD_ADC_POS_REF_V;	// TODO: provide true vref
 }
 
 uint32_t px4_arch_adc_temp_sensor_mask()

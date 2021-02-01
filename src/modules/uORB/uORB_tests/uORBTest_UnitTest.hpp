@@ -33,37 +33,24 @@
 
 #ifndef _uORBTest_UnitTest_hpp_
 #define _uORBTest_UnitTest_hpp_
-#include "../uORBCommon.hpp"
-#include "../uORB.h"
+
+#include <uORB/uORB.h>
+#include <uORB/uORBDeviceMaster.hpp>
+#include <uORB/uORBDeviceNode.hpp>
+#include <uORB/uORBManager.hpp>
+#include <uORB/topics/orb_test.h>
+#include <uORB/topics/orb_test_medium.h>
+#include <uORB/topics/orb_test_large.h>
+
+#include <px4_platform_common/defines.h>
+#include <px4_platform_common/posix.h>
 #include <px4_platform_common/time.h>
 #include <px4_platform_common/tasks.h>
+
+#include <drivers/drv_hrt.h>
+
+#include <errno.h>
 #include <unistd.h>
-
-struct orb_test {
-	int val;
-	hrt_abstime time;
-};
-ORB_DECLARE(orb_test);
-ORB_DECLARE(orb_multitest);
-
-
-struct orb_test_medium {
-	int val;
-	hrt_abstime time;
-	char junk[64];
-};
-ORB_DECLARE(orb_test_medium);
-ORB_DECLARE(orb_test_medium_multi);
-ORB_DECLARE(orb_test_medium_queue);
-ORB_DECLARE(orb_test_medium_queue_poll);
-
-struct orb_test_large {
-	int val;
-	hrt_abstime time;
-	char junk[512];
-};
-ORB_DECLARE(orb_test_large);
-
 
 namespace uORBTest
 {
@@ -77,15 +64,22 @@ public:
 	// Singleton pattern
 	static uORBTest::UnitTest &instance();
 	~UnitTest() = default;
+
 	int test();
-	template<typename S> int latency_test(orb_id_t T, bool print);
+	int latency_test(bool print);
 	int info();
 
 	// Disallow copy
 	UnitTest(const uORBTest::UnitTest & /*unused*/) = delete;
 
+	// Assist in testing the wrap-around situation
+	static void set_generation(uORB::DeviceNode &node, unsigned generation)
+	{
+		node._generation.store(generation);
+	}
+
 private:
-	UnitTest() : pubsubtest_passed(false), pubsubtest_print(false) {}
+	UnitTest() = default;
 
 	static int pubsubtest_threadEntry(int argc, char *argv[]);
 	int pubsublatency_main();
@@ -95,11 +89,11 @@ private:
 
 	volatile bool _thread_should_exit;
 
-	bool pubsubtest_passed;
-	bool pubsubtest_print;
+	bool pubsubtest_passed{false};
+	bool pubsubtest_print{false};
 	int pubsubtest_res = OK;
 
-	orb_advert_t _pfd[4]; ///< used for test_multi and test_multi_reversed
+	orb_advert_t _pfd[4] {}; ///< used for test_multi and test_multi_reversed
 
 	int test_single();
 
@@ -109,6 +103,10 @@ private:
 	int test_unadvertise();
 
 	int test_multi2();
+
+	int test_wrap_around();
+
+	int test_SubscriptionMulti();
 
 	/* queuing tests */
 	int test_queue();
@@ -120,58 +118,5 @@ private:
 	int test_fail(const char *fmt, ...);
 	int test_note(const char *fmt, ...);
 };
-
-template<typename S>
-int uORBTest::UnitTest::latency_test(orb_id_t T, bool print)
-{
-	test_note("---------------- LATENCY TEST ------------------");
-	S t;
-	t.val = 308;
-	t.time = hrt_absolute_time();
-
-	orb_advert_t pfd0 = orb_advertise(T, &t);
-
-	if (pfd0 == nullptr) {
-		return test_fail("orb_advertise failed (%i)", errno);
-	}
-
-	char *const args[1] = { nullptr };
-
-	pubsubtest_print = print;
-	pubsubtest_passed = false;
-
-	/* test pub / sub latency */
-
-	// Can't pass a pointer in args, must be a null terminated
-	// array of strings because the strings are copied to
-	// prevent access if the caller data goes out of scope
-	int pubsub_task = px4_task_spawn_cmd("uorb_latency",
-					     SCHED_DEFAULT,
-					     SCHED_PRIORITY_MAX,
-					     2000,
-					     (px4_main_t)&uORBTest::UnitTest::pubsubtest_threadEntry,
-					     args);
-
-	/* give the test task some data */
-	while (!pubsubtest_passed) {
-		++t.val;
-		t.time = hrt_absolute_time();
-
-		if (PX4_OK != orb_publish(T, pfd0, &t)) {
-			return test_fail("mult. pub0 timing fail");
-		}
-
-		/* simulate >800 Hz system operation */
-		px4_usleep(1000);
-	}
-
-	if (pubsub_task < 0) {
-		return test_fail("failed launching task");
-	}
-
-	orb_unadvertise(pfd0);
-
-	return pubsubtest_res;
-}
 
 #endif // _uORBTest_UnitTest_hpp_

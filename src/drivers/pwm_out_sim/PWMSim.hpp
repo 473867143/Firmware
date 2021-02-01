@@ -44,6 +44,8 @@
 #include <px4_platform_common/time.h>
 #include <uORB/topics/parameter_update.h>
 
+using namespace time_literals;
+
 class PWMSim : public cdev::CDev, public ModuleBase<PWMSim>, public OutputModuleInterface
 {
 public:
@@ -61,21 +63,21 @@ public:
 	/** @see ModuleBase::print_status() */
 	int print_status() override;
 
-	void Run() override;
-
 	int ioctl(device::file_t *filp, int cmd, unsigned long arg) override;
 
 	bool updateOutputs(bool stop_motors, uint16_t outputs[MAX_ACTUATORS],
 			   unsigned num_outputs, unsigned num_control_groups_updated) override;
 
 private:
+
+	void Run() override;
+
 	static constexpr uint16_t PWM_SIM_DISARMED_MAGIC = 900;
 	static constexpr uint16_t PWM_SIM_FAILSAFE_MAGIC = 600;
 	static constexpr uint16_t PWM_SIM_PWM_MIN_MAGIC = 1000;
 	static constexpr uint16_t PWM_SIM_PWM_MAX_MAGIC = 2000;
 
 	MixingOutput _mixing_output{MAX_ACTUATORS, *this, MixingOutput::SchedulingPolicy::Auto, false, false};
-	uORB::Subscription _parameter_update_sub{ORB_ID(parameter_update)};
-
+	uORB::SubscriptionInterval _parameter_update_sub{ORB_ID(parameter_update), 1_s};
 };
 
